@@ -2,6 +2,14 @@
 const express = require("express")
 const router = express.Router()
 
+const redirectLogin = (req, res, next) => {
+    if (!req.session.userId ) {
+      res.redirect('./login') // redirect to the login page
+    } else { 
+        next (); // move to the next middleware function
+    } 
+}
+
 
 router.get('/register', function (req, res, next) {
     res.render('register.ejs')                                                               
@@ -29,7 +37,7 @@ router.post('/registered', function (req, res, next) {
                                                                              
 })
 
-router.get('/list', function (req, res, next) {
+router.get('/list', redirectLogin, function (req, res, next) {
     let sqlquery = "SELECT id, username, firstName, lastName, email FROM users;"
     // execute sql query
     db.query(sqlquery, (err, result) => {
@@ -61,21 +69,32 @@ router.post('/loggedin', function (req, res, next) {
                     next(err)
                 }
                 else if (bcryptresult == true) {
-                    res.send('You are now logged in :)')
+                    req.session.userId = req.body.username;
+                    res.send('You are now logged in :) <a href='+'/'+'>Home</a>')
                 }
                 else {
-                    res.send('Sorry, the password you have given is incorrect')
+                    res.send('Sorry, the password you have given is incorrect <a href='+'./login'+'>Try again</a>')
                 }
                 })
             }
             else{
-                res.send('Sorry, user not found')
+                res.send('Sorry, user not found <a href='+'./login'+'>Try again</a>')
             }
         }
     
                                              
 })   
 }) 
+
+router.get('/logout', redirectLogin, (req,res) => {
+    req.session.destroy(err => {
+    if (err) {
+      return res.redirect('/')
+    }
+    res.send('You are now logged out. <a href='+'/'+'>Home</a>');
+    })
+})
+
 
 // Export the router object so index.js can access it
 module.exports = router
