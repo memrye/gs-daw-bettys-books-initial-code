@@ -1,6 +1,7 @@
 // Create a new router
 const express = require("express")
 const router = express.Router()
+const { check, validationResult } = require('express-validator');
 
 const redirectLogin = (req, res, next) => {
     if (!req.session.userId ) {
@@ -15,26 +16,54 @@ router.get('/register', function (req, res, next) {
     res.render('register.ejs')                                                               
 })    
 
-router.post('/registered', function (req, res, next) {
-    const bcrypt = require('bcrypt')
-    const saltRounds = 10
-    const plainPassword = req.body.password
-    bcrypt.hash(plainPassword, saltRounds, function(err, hashedPassword){
-        // store hashed password in db
-        let sqlquery = "INSERT INTO users (username, firstName, lastName, email, hashedPassword) VALUES (?,?,?,?,?);"
-        let newrecord = [req.body.username, req.body.first, req.body.last, req.body.email, hashedPassword]
-        // saving data in database
-        db.query(sqlquery, newrecord, (err, result) => {
-            if (err) {
-                next(err)
-            }
-            else
-                result = 'Hello '+ req.body.first + ' ' + req.body.last +' you are now registered!  We will send an email to you at ' + req.body.email
-                result += ' Your password is: '+ req.body.password +' and your hashed password is: '+ hashedPassword
-                res.send(result)
-        })
-    })
-                                                                             
+router.post('/registered', [
+    check('username')
+        .notEmpty()
+        .isAlphanumeric()
+        .not().contains(' ')
+        .isLength({ min: 3, max: 20 }),
+    check('first')
+        .notEmpty()
+        .isAlpha()
+        .not().contains(' ')
+        .isLength({ min: 2, max: 20 }),
+    check('last')
+        .notEmpty()
+        .isAlpha()
+        .not().contains(' ')
+        .isLength({ min: 2, max: 50 }),
+    check('email')
+        .notEmpty()
+        .isEmail()
+        .not().contains(' '),
+    check('password')
+        .notEmpty()
+        .not().contains(' ')
+        .isLength({ min: 8 })
+], function (req, res, next) {
+    const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            res.redirect('./register'); }
+        else {
+            const bcrypt = require('bcrypt')
+            const saltRounds = 10
+            const plainPassword = req.sanitize(req.body.password)
+            bcrypt.hash(plainPassword, saltRounds, function(err, hashedPassword){
+                // store hashed password in db
+                let sqlquery = "INSERT INTO users (username, firstName, lastName, email, hashedPassword) VALUES (?,?,?,?,?);"
+                let newrecord = [req.sanitize(req.body.username), req.sanitize(req.body.first), req.sanitize(req.body.last), req.sanitize(req.body.email), hashedPassword]
+                // saving data in database
+                db.query(sqlquery, newrecord, (err, result) => {
+                    if (err) {
+                        next(err)
+                    }
+                    else
+                        result = 'Hello '+ req.body.first + ' ' + req.body.last +' you are now registered!  We will send an email to you at ' + req.body.email
+                        result += ' Your password is: '+ req.body.password +' and your hashed password is: '+ hashedPassword
+                        res.send(result)
+                })
+            })
+        }                                                                   
 })
 
 router.get('/list', redirectLogin, function (req, res, next) {
@@ -55,7 +84,7 @@ router.get('/login', function (req, res, next) {
 router.post('/loggedin', function (req, res, next) {
     const bcrypt = require('bcrypt')
     let sqlquery = "SELECT hashedPassword FROM users WHERE username = ?;"
-    const attemptusername = req.body.username    
+    const attemptusername = req.sanitize(req.body.username)    
     db.query(sqlquery, attemptusername, (err, result) => {
         if (err) {
             next(err)
@@ -64,12 +93,12 @@ router.post('/loggedin', function (req, res, next) {
             if(result.length > 0){
                 let hashedPassword = result[0].hashedPassword
                 // Compare the password supplied with the password in the database
-                bcrypt.compare(req.body.password, hashedPassword, function(err, bcryptresult) {
+                bcrypt.compare(req.sanitize(req.body.password), hashedPassword, function(err, bcryptresult) {
                 if (err) {
                     next(err)
                 }
                 else if (bcryptresult == true) {
-                    req.session.userId = req.body.username;
+                    req.session.userId = req.sanitize(req.body.username);
                     res.send('You are now logged in :) <a href='+'/'+'>Home</a>')
                 }
                 else {
