@@ -12,7 +12,10 @@ var validator = require ('express-validator');
 const expressSanitizer = require('express-sanitizer');
 
 //Import express-session module
-var session = require ('express-session')
+var session = require ('express-session');
+
+//Import request module
+const request = require('request');
 
 // Create the express application object
 const app = express()
